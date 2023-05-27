@@ -1,6 +1,6 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
+  "name": "Launcher",
+  "author": "Shihira Fung",
   "flags": ["debug", "_root"],
   "publish": {
     "tags": ["template", "root"],
