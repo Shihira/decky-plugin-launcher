@@ -14,25 +14,44 @@ import {
   staticClasses,
 } from "decky-frontend-lib";
 
-import { VFC, ReactNode } from "react";
+import {
+  VFC,
+  ReactNode,
+  ReactNodeArray,
+  ReactElement,
+  useState,
+  useEffect,
+} from "react";
 import { BsTerminalFill, BsLightningFill, BsGrid3X3GapFill } from "react-icons/bs";
 
+interface CommandResult {
+  retcode: number;
+  stdout: string;
+  stderr: string;
+}
+
 const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
-  const spawnProcess = async (cmd) => {
+  const spawnProcess = async (cmd: string, name: string, toasting: boolean = true) => {
     const result = await serverAPI.callPluginMethod("launch", { "cmd": cmd });
     if (result.success) {
-      serverAPI.toaster.toast({
-          "title": "Executed " + (result.result.retcode == 0 ? "successfully" : "with error " + result.result.retcode),
-          "body": (result.result.stdout + " " + result.result.stderr)
-      });
+      const resultCmd = result.result as CommandResult;
+      if (toasting) {
+        serverAPI.toaster.toast({
+            "title": `Executed ${name} ${resultCmd.retcode == 0 ? "successfully" : "with error " + resultCmd.retcode}`,
+            "body": (resultCmd.stdout + " " + resultCmd.stderr)
+        });
+      }
+      return resultCmd;
     }
+    return {retcode: -1, stdout: "", stderr: ""};
   };
 
-  const LaunchMenu : VFC<{name : string, cmd : string}> = ({name, cmd}) => {
-      return (<MenuItem onSelected={async () => {await spawnProcess(cmd);}}>{name}</MenuItem>);
+  const LaunchMenu : VFC<{tag?: string, eq?: string, name: string, cmd: string}> = ({tag, eq, name, cmd}) => {
+      return (<MenuItem onSelected={async () => {await spawnProcess(cmd, name);}}>{name}</MenuItem>);
   }
 
-  const LaunchRow : VFC<{name : string, cmd : string, children?: ReactNode}> = ({name, cmd, children}) => {
+  const LaunchRow : VFC<{name: string, children?: ReactNodeArray}> = ({name, children}) => {
+    const [state, setState] = useState({ eq: false });
     const showCtxMenu = (e: MouseEvent | GamepadEvent) => {
       showContextMenu(
         <Menu label={name}>
@@ -42,7 +61,21 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
       );
     };
 
-    const button_style = {
+    var cmdEq: string = "";
+    var cmdStart: string = "";
+    var cmdStop: string = "";
+    var stringEq: string = "";
+
+    if (children) {
+      for (var node of children) {
+        const elem = node as ReactElement;
+        if (elem.props.tag == "start") { cmdStart = elem.props.cmd; }
+        if (elem.props.tag == "stop") { cmdStop = elem.props.cmd; }
+        if (elem.props.tag == "eq") { cmdEq = elem.props.cmd; stringEq = elem.props.eq; }
+      }
+    }
+
+    const buttonStyle = {
       minHeight: "35px",
       minWidth: "40px",
       maxWidth: "40px",
@@ -52,20 +85,29 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
       alignItems: "center"
     };
 
-    const margin_right_style = {
-      marginRight: "2px",
+    const queryEqState = async () => {
+      if (!stringEq) return;
+      const result = await spawnProcess(cmdEq, "Eq", false);
+      if (result && result.retcode == 0) {
+        const eq = result.stdout.trim() == stringEq;
+        setState({eq : eq});
+        return eq;
+      }
+      return false;
     };
+
+    useEffect(() => { queryEqState(); }, [/*execute on load*/]);
 
     return (
       <Field label={name}>
         <Focusable style={{display: 'flex', flexDirection: 'row', paddingLeft: "10px", paddingRight: "10px"}}>
           <DialogButton
-            style={{...button_style, ...margin_right_style}}
-            onClick={async() => {await spawnProcess(cmd);}}>
-            <BsLightningFill/>
+            style={{...buttonStyle, marginRight: "2px"}}
+            onClick={state.eq ? () => {spawnProcess(cmdStop, "tag:stop")} : () => {spawnProcess(cmdStart, "tag:start")}}>
+            <BsLightningFill color={state.eq ? "green" : ""}/>
           </DialogButton>
           <DialogButton
-            style={button_style}
+            style={buttonStyle}
             onClick={(e) => { showCtxMenu(e); }}>
             <BsGrid3X3GapFill/>
           </DialogButton>
@@ -76,14 +118,16 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
 
   return (
     <PanelSection title="Services">
-      <LaunchRow name="Leaf" cmd="/home/deck/Dotfiles/deck/leaf.sh start">
-        <LaunchMenu name="Status" cmd="/home/deck/Dotfiles/deck/leaf.sh"/>
+      <LaunchRow name="Leaf">
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd="/home/deck/Dotfiles/deck/leaf.sh"/>
+        <LaunchMenu tag="start" name="Start" cmd="/home/deck/Dotfiles/deck/leaf.sh start"/>
         <LaunchMenu name="Start Global" cmd="/home/deck/Dotfiles/deck/leaf.sh start global"/>
-        <LaunchMenu name="Stop" cmd="/home/deck/Dotfiles/deck/leaf.sh stop"/>
+        <LaunchMenu tag="stop" name="Stop" cmd="/home/deck/Dotfiles/deck/leaf.sh stop"/>
       </LaunchRow>
-      <LaunchRow name="Auto Brightness" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user restart auto_brightness">
-        <LaunchMenu name="Status" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active auto_brightness"/>
-        <LaunchMenu name="Stop" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user stop auto_brightness"/>
+      <LaunchRow name="Auto Brightness">
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active auto_brightness"/>
+        <LaunchMenu tag="start" name="Start" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user restart auto_brightness"/>
+        <LaunchMenu tag="stop" name="Stop" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user stop auto_brightness"/>
       </LaunchRow>
     </PanelSection>
   );
