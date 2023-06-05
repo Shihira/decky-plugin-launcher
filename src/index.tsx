@@ -116,18 +116,38 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
     );
   };
 
+  const conf_dir: string = "/home/deck/Dotfiles";
+  const sudo: string = `${conf_dir}/deck/deck_sudo`;
+  const user_systemctl: string = "XDG_RUNTIME_DIR=/run/user/1000 systemctl --user";
+
   return (
     <PanelSection title="Services">
       <LaunchRow name="Leaf">
-        <LaunchMenu tag="eq" eq="active" name="Status" cmd="/home/deck/Dotfiles/deck/leaf.sh"/>
-        <LaunchMenu tag="start" name="Start" cmd="/home/deck/Dotfiles/deck/leaf.sh start"/>
-        <LaunchMenu name="Start Global" cmd="/home/deck/Dotfiles/deck/leaf.sh start global"/>
-        <LaunchMenu tag="stop" name="Stop" cmd="/home/deck/Dotfiles/deck/leaf.sh stop"/>
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd={`systemctl is-active leaf`}/>
+        <LaunchMenu tag="start" name="Start" cmd={`sed -i 's/FINAL.*/FINAL,Direct/g' ${conf_dir}/leaf/leaf.conf; ${sudo} systemctl restart leaf`}/>
+        <LaunchMenu name="Start Global" cmd={`sed -i 's/FINAL.*/FINAL,Socks_Proxy/g' ${conf_dir}/leaf/leaf.conf; ${sudo} systemctl restart leaf`}/>
+        <LaunchMenu tag="stop" name="Stop" cmd={`${sudo} systemctl stop leaf`}/>
       </LaunchRow>
       <LaunchRow name="Auto Brightness">
-        <LaunchMenu tag="eq" eq="active" name="Status" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active auto_brightness"/>
-        <LaunchMenu tag="start" name="Start" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user restart auto_brightness"/>
-        <LaunchMenu tag="stop" name="Stop" cmd="XDG_RUNTIME_DIR=/run/user/1000 systemctl --user stop auto_brightness"/>
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd={`${user_systemctl} is-active auto_brightness`}/>
+        <LaunchMenu tag="start" name="Start" cmd={`${user_systemctl} restart auto_brightness`}/>
+        <LaunchMenu tag="stop" name="Stop" cmd={`${user_systemctl} stop auto_brightness`}/>
+      </LaunchRow>
+      <LaunchRow name="Synergy">
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd={`${user_systemctl} is-active synergy`}/>
+        <LaunchMenu tag="start" name="Start" cmd={`${user_systemctl} restart synergy`}/>
+        <LaunchMenu tag="stop" name="Stop" cmd={`${user_systemctl} stop synergy`}/>
+      </LaunchRow>
+      <LaunchRow name="Ethernet over USB">
+        <LaunchMenu tag="eq" eq="usb0" name="Status" cmd={`ip route | grep -o usb0`}/>
+        <LaunchMenu tag="start" name="Start" cmd={`${sudo} ${conf_dir}/deck/usb-ether.sh start -n -R`}/>
+        <LaunchMenu tag="stop" name="Stop" cmd={`${sudo} ${conf_dir}/deck/usb-ether.sh stop`}/>
+        <LaunchMenu name="Restart networkd" cmd={`${sudo} systemctl restart systemd-networkd`}/>
+      </LaunchRow>
+      <LaunchRow name="Samba">
+        <LaunchMenu tag="eq" eq="active" name="Status" cmd={`systemctl is-active smb`}/>
+        <LaunchMenu tag="start" name="Start" cmd={`${sudo} systemctl restart smb`}/>
+        <LaunchMenu tag="stop" name="Stop" cmd={`${sudo} systemctl stop smb`}/>
       </LaunchRow>
     </PanelSection>
   );
