@@ -21,6 +21,7 @@ import {
   ReactElement,
   useState,
   useEffect,
+  useCallback,
 } from "react";
 import { BsTerminalFill, BsLightningFill, BsGrid3X3GapFill } from "react-icons/bs";
 
@@ -85,18 +86,23 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
       alignItems: "center"
     };
 
-    const queryEqState = async () => {
-      if (!stringEq) return;
+    const queryEqState = useCallback(async () => {
       const result = await spawnProcess(cmdEq, "Eq", false);
       if (result && result.retcode == 0) {
         const eq = result.stdout.trim() == stringEq;
-        setState({eq : eq});
+        setState({eq: eq});
         return eq;
+      } else {
+        setState({eq: false});
+        return false;
       }
-      return false;
-    };
+    }, []);
 
-    useEffect(() => { queryEqState(); }, [/*execute on load*/]);
+    useEffect(() => {
+        queryEqState();
+        const timer = setInterval(queryEqState, 3000);
+        return () => { clearInterval(timer); };
+    }, [/*execute on load*/]);
 
     return (
       <Field label={name}>
@@ -104,7 +110,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
           <DialogButton
             style={{...buttonStyle, marginRight: "2px"}}
             onClick={state.eq ? () => {spawnProcess(cmdStop, "tag:stop")} : () => {spawnProcess(cmdStart, "tag:start")}}>
-            <BsLightningFill color={state.eq ? "green" : ""}/>
+            <BsLightningFill color={state.eq ? "green" : "gray"}/>
           </DialogButton>
           <DialogButton
             style={buttonStyle}
@@ -114,6 +120,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
         </Focusable>
       </Field>
     );
+
   };
 
   const conf_dir: string = "/home/deck/Dotfiles";
@@ -126,6 +133,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({serverAPI}) => {
         <LaunchMenu tag="eq" eq="active" name="Status" cmd={`systemctl is-active leaf`}/>
         <LaunchMenu tag="start" name="Start" cmd={`sed -i 's/FINAL.*/FINAL,Direct/g' ${conf_dir}/leaf/leaf.conf; ${sudo} systemctl restart leaf`}/>
         <LaunchMenu name="Start Global" cmd={`sed -i 's/FINAL.*/FINAL,Socks_Proxy/g' ${conf_dir}/leaf/leaf.conf; ${sudo} systemctl restart leaf`}/>
+        <LaunchMenu name="Start Host" cmd={`sed -i 's/FINAL.*/FINAL,Host_Proxy/g' ${conf_dir}/leaf/leaf.conf; ${sudo} systemctl restart leaf`}/>
         <LaunchMenu tag="stop" name="Stop" cmd={`${sudo} systemctl stop leaf`}/>
       </LaunchRow>
       <LaunchRow name="Auto Brightness">
